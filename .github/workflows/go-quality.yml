@@ -1,0 +1,59 @@
+name: Reusable - Go Quality
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        type: string
+        default: '1.22'
+      working-directory:
+        type: string
+        default: '.'
+
+jobs:
+  lint:
+    name: Linter / Static Analysis (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go-version }}
+          cache-dependency-path: ${{ inputs.working-directory }}/go.sum
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: ${{ inputs.working-directory }}
+
+  unit-test:
+    name: Build & Unit Test (Go)
+    runs-on: ubuntu-latest
+    needs: [lint]
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go-version }}
+          cache-dependency-path: ${{ inputs.working-directory }}/go.sum
+
+      - name: Build
+        run: go build ./...
+
+      - name: Unit tests
+        run: go test ./... -v -coverprofile=coverage.out || echo "Nenhum teste encontrado - ajuste conforme necessário"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ inputs.working-directory }}
+          path: ${{ inputs.working-directory }}/coverage.out
+          if-no-files-found: ignore

@@ -1,0 +1,54 @@
+name: Reusable - DevSecOps Security (Python)
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        type: string
+        default: '3.11'
+      working-directory:
+        type: string
+        default: '.'
+      trivy-severity:
+        description: 'Severidades que derrubam o pipeline (SCA)'
+        type: string
+        default: 'CRITICAL'
+
+jobs:
+  sast-bandit:
+    name: SAST - Bandit (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: 'pip'
+
+      - name: Install Bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit
+
+      - name: Run Bandit (falha em severidade alta/crítica)
+        run: bandit -r . -ll -iii -x ./tests,./venv,./.venv
+
+  sca-trivy:
+    name: SCA - Trivy FS (dependências)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          scan-type: 'fs'
+          scan-ref: ${{ inputs.working-directory }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: ${{ inputs.trivy-severity }}

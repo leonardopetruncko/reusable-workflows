@@ -1,0 +1,60 @@
+name: Reusable - Update GitOps Repo (image tag)
+
+on:
+  workflow_call:
+    inputs:
+      gitops-repo:
+        description: 'org/repo do repositório de GitOps'
+        type: string
+        required: true
+      gitops-ref:
+        type: string
+        default: 'main'
+      service-name:
+        description: 'Nome do microsserviço (ex: auth-service)'
+        type: string
+        required: true
+      image-uri:
+        description: 'URI completa da imagem (registry/repo:tag)'
+        type: string
+        required: true
+      manifest-path:
+        description: 'Caminho, dentro do repo GitOps, do deployment.yaml do serviço'
+        type: string
+        required: true
+    secrets:
+      GITOPS_PUSH_TOKEN:
+        required: true
+
+jobs:
+  update-manifest:
+    name: Atualiza tag da imagem no repo GitOps
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.gitops-repo }}
+          ref: ${{ inputs.gitops-ref }}
+          token: ${{ secrets.GITOPS_PUSH_TOKEN }}
+          path: gitops
+
+      - name: Instalar yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Atualizar image tag no manifesto
+        working-directory: gitops
+        run: |
+          yq -i '.spec.template.spec.containers[0].image = "${{ inputs.image-uri }}"' "${{ inputs.manifest-path }}"
+          git diff --color "${{ inputs.manifest-path }}" || true
+
+      - name: Commit & push
+        working-directory: gitops
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${{ inputs.manifest-path }}"
+          git commit -m "chore(${{ inputs.service-name }}): atualiza imagem para ${{ inputs.image-uri }}" || echo "Nada para commitar"
+          git push

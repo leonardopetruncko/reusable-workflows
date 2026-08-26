@@ -1,0 +1,52 @@
+name: Reusable - DevSecOps Security (Go)
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        type: string
+        default: '1.22'
+      working-directory:
+        type: string
+        default: '.'
+      trivy-severity:
+        description: 'Severidades que derrubam o pipeline (SCA)'
+        type: string
+        default: 'CRITICAL'
+
+jobs:
+  sast-gosec:
+    name: SAST - gosec (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go-version }}
+
+      - name: Run gosec (falha em severidade alta/crítica)
+        uses: securego/gosec@master
+        with:
+          args: '-severity high -confidence high ./...'
+        env:
+          GOFLAGS: '-buildvcs=false'
+
+  sca-trivy:
+    name: SCA - Trivy FS (dependências)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          scan-type: 'fs'
+          scan-ref: ${{ inputs.working-directory }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: ${{ inputs.trivy-severity }}
