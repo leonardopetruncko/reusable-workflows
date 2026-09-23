@@ -5,7 +5,7 @@ on:
     inputs:
       go-version:
         type: string
-        default: '1.22'
+        default: '1.26'
       working-directory:
         type: string
         default: '.'
@@ -25,10 +25,13 @@ jobs:
           go-version: ${{ inputs.go-version }}
           cache-dependency-path: ${{ inputs.working-directory }}/go.sum
 
+      # v9 + golangci-lint v2: a linha v1 é compilada com Go 1.24 e recusa
+      # módulos que têm como alvo Go 1.25+ ("the Go language version used to build
+      # golangci-lint is lower than the targeted Go version").
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          version: v2.13.2
           working-directory: ${{ inputs.working-directory }}
 
   unit-test:
