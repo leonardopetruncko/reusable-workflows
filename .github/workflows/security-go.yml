@@ -27,11 +27,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ inputs.go-version }}
+          cache-dependency-path: ${{ inputs.working-directory }}/go.sum
 
+      # gosec instalado via "go install" (e não pela action Docker) para rodar dentro do
+      # working-directory: funciona tanto em repo de um serviço quanto em monorepo.
       - name: Run gosec (falha em severidade alta/crítica)
-        uses: securego/gosec@master
-        with:
-          args: '-severity high -confidence high ./...'
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          "$(go env GOPATH)/bin/gosec" -severity high -confidence high ./...
         env:
           GOFLAGS: '-buildvcs=false'
 

@@ -56,5 +56,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "${{ inputs.manifest-path }}"
-          git commit -m "chore(${{ inputs.service-name }}): atualiza imagem para ${{ inputs.image-uri }}" || echo "Nada para commitar"
-          git push
+          git commit -m "chore(${{ inputs.service-name }}): atualiza imagem para ${{ inputs.image-uri }}" || { echo "Nada para commitar"; exit 0; }
+          # Retry com rebase: em monorepo, vários serviços podem atualizar o repo GitOps ao
+          # mesmo tempo (cada um mexe só no próprio manifesto, então o rebase não conflita).
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            echo "Push recusado (tentativa $i): rebase com o remoto e nova tentativa..."
+            sleep $((i * 3))
+            git pull --rebase origin "${{ inputs.gitops-ref }}"
+          done
+          echo "Não consegui atualizar o repo GitOps após 5 tentativas." && exit 1
